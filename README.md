@@ -1,1 +1,1 @@
-# TiniDB
+# TinyDB

@@ -30,3 +30,8 @@
 # CLion
 .idea/
 build/
+
+# Cxm's
+*.swp
+scratchBoard.cc
+scratchBoard.o

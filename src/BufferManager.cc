@@ -8,7 +8,20 @@ namespace BufferManager {
 	/*
 	   Some constants
 	 */ 
-	const PAGE_SIZE = 4096 * 1024;
+	const int PAGE_SIZE = 4096 * 1024;
+
+	const int BUFFER_PAGE_LIMIT = 10;
+
+	const int RECORD_PAGE = 1;
+	const int INDEX_PAGE = 2;
+	const int CATALOG_PAGE = 3;
+	
+
+	/*
+		Some meta-informations 
+	 */
+	int currentPageNum = 0;
+
 
 	/*
 	   Class Page
@@ -17,7 +30,7 @@ namespace BufferManager {
 	class Page {
 	private:
 		char *p;
-		int lock, dirty;
+		int lock, dirty, type;
 		time_t lastUseTime;
 	public:
 		static int capacity;
@@ -46,7 +59,6 @@ namespace BufferManager {
 	/*
 		Internal ultilities
 	 */
-	void initialize();
 }
 
 
@@ -58,11 +70,23 @@ namespace BufferManager {
 	int Page::capacity = PAGE_SIZE; //4KB
 
 	//Definition of class Page
-	Page::Page(): p(new char[PAGE_SIZE]) {
-		
+	Page::Page(): p(new char[PAGE_SIZE]()) {
+
 	}
 
 	//Definition of interfaces
+	Page::Page& pull(Table& tb, int pid, int*errCode) {
+
+	}
+
+	Page::Page& create(Table& tb, int pid, int*errCode) {
+		if (currentPageNum < BUFFER_PAGE_LIMIT) {
+			Page
+		}
+		else {
+			//do some swap
+		}
+	}
 
 	//Definition of internal ultilities
 	void initialize() {

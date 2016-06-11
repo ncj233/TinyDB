@@ -29,12 +29,15 @@ namespace BufferManager {
 
 	class Page {
 	private:
-		char *p;
+		char * const p;
 		int lock, dirty, type;
 		time_t lastUseTime;
 	public:
 		static int capacity;
-		Page();
+		Page(const std::string& fileName, int pid_);
+		char getc(int offset) const {
+			return *(p+offset);
+		}
 	};
 
 	/*
@@ -42,19 +45,19 @@ namespace BufferManager {
 	*/
 
 	//for table users
-	Page& pull(Table& tb, int pid, int* errCode); 
-	Page& create(Table& tb, int user, int* errCode); 
-	int commit(Table& tb, int user, int* errcode);
+	//Page& pull(Table& tb, int pid, int* errCode); 
+	//Page& create(Table& tb, int user, int* errCode); 
+	//int commit(Table& tb, int user, int* errcode);
 
 	//for index users
-	Page& pull(Index& idx, int pid, int* errCode); 
-	Page& create(Index& idx, int user, int* errCode); 
-	int commit(Index& idx, int user, int* errcode);
+	//Page& pull(Index& idx, int pid, int* errCode); 
+	//Page& create(Index& idx, int user, int* errCode); 
+	//int commit(Index& idx, int user, int* errcode);
 
 	//for catalog users
-	Page& pull(int pid, int* errCode); 
-	Page& create(int user, int* errCode); 
-	int commit(int user, int* errcode);
+	//Page& pull(int pid, int* errCode); 
+	//Page& create(int user, int* errCode); 
+	//int commit(int user, int* errcode);
 
 	/*
 		Internal ultilities
@@ -70,18 +73,24 @@ namespace BufferManager {
 	int Page::capacity = PAGE_SIZE; //4KB
 
 	//Definition of class Page
-	Page::Page(): p(new char[PAGE_SIZE]()) {
-
+	Page::Page(const std::string& fileName, int pid_):
+		p(new char[PAGE_SIZE]())
+	{
+		std::ifstream ifs(fileName.c_str(), std::ios::in | std::ios::binary);
+		ifs.seekg(pid_ * PAGE_SIZE);
+		char *pw = p;
+		for (int i=0; i<PAGE_SIZE; ++i)	*pw++ = ifs.get();
+		ifs.close();
 	}
 
 	//Definition of interfaces
-	Page::Page& pull(Table& tb, int pid, int*errCode) {
+	//Page::Page& pull(Table& tb, int pid, int*errCode) {
 
-	}
+	//}
 
 	Page::Page& create(Table& tb, int pid, int*errCode) {
 		if (currentPageNum < BUFFER_PAGE_LIMIT) {
-			Page
+			Page newPage(tb.getname(), pid+1); //fist page use for bookkeeping
 		}
 		else {
 			//do some swap
@@ -89,11 +98,12 @@ namespace BufferManager {
 	}
 
 	//Definition of internal ultilities
-	void initialize() {
-
-	}
 }
 
 int main() {
-	std::cout << BufferManager::Page::capacity << std::endl;
+		
+	namespace BM = BufferManager;
+	BM::Page p1(std::string("a.txt"), 0);
+	for (int i=0; i<BM::PAGE_SIZE; ++i) std::cout << p1.getc(i);
+	std::cout << std::endl;
 }

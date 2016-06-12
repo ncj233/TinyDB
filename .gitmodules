@@ -1,0 +1,3 @@
+[submodule "vendor/PEGTL"]
+	path = vendor/PEGTL
+	url = https://github.com/ColinH/PEGTL.git

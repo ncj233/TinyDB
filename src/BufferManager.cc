@@ -39,6 +39,10 @@ namespace BufferManager {
     const int INDEX_PAGE = 2;
     const int CATALOG_PAGE = 3;
 
+    //error code
+    const int CORRELATE_SUCCESS = 2;
+    const int FILE_SIZE_TOO_SMALL = 2;
+
     /*
      *functors
      * */
@@ -57,28 +61,40 @@ namespace BufferManager {
 
     class Page {
     private:
+
+         /*
+          *private member objects
+          * */
         char * const p;
         int lock, dirty;
         int last_use_time;
+
+        /*
+         *private member functions
+         * */
+        void set_lock() {
+            this->lock = 1;
+        }
+
+        void unset_lock() {
+            this->lock = 0;
+        }
+
+        int correlate_with_file() const;
+
+
     public:
-        //static member varibles
+        //static member objects
         static int capacity;
 
         //ctors
-        Page(const std::string& file_name, int pid_);
+        Page();
 
         //interfaces
         char getc(int offset) const {
             return *(p+offset);
         }
 
-        void set_lock() {
-            lock = 1;
-        }
-
-        void unset_lock() {
-            lock = 0;
-        }
     };
 
     /*
@@ -128,14 +144,23 @@ namespace BufferManager
     int Page::capacity = PAGE_SIZE; //4KB
 
     //Definition of class Page
-    Page::Page(const std::string& file_name, int pid_):
-        p(new char[PAGE_SIZE]()), lock(0), dirty(0), last_use_time(-1)
-    {
+    Page::Page(): p(new char[PAGE_SIZE]()), lock(0), dirty(0), last_use_time(-1) {};
+
+    int correlate_with_file(const string& file_name, int pid) const {
+        int return_code = CORRELATE_SUCCESS;
         std::ifstream ifs(file_name.c_str(), std::ios::in | std::ios::binary);
-        ifs.seekg(pid_ * PAGE_SIZE);
-        char *pw = p;
-        for (int i=0; i<PAGE_SIZE; ++i) *pw++ = ifs.get();
+
+        ifs.seekg(0, std::ios::end);
+        if (pid * PAGE_SIZE + PAGE_SIZE - 1 > ifs.tellg()) {
+            return_code = FILE_SIZE_TOO_SMALL;
+        }
+        else {
+            ifs.seekg(pid * PAGE_SIZE);
+            ifs.read(this->p, PAGE_SIZE);
+        }
+
         ifs.close();
+        return return_code;
     }
 
     //Definition of interfaces
@@ -143,11 +168,12 @@ namespace BufferManager
 
     //}
 
-    Page& create(Table& tb, int pid, int *err_code) {
+    Page& create(Table& tb, int _pid, int *err_code) {
         if (current_table_page_num < BUFFER_PAGE_LIMIT) {
-            Page& new_page = *(new Page(tb.get_name(), pid));
+            Page& new_page = *(new Page(tb.get_name());
             new_page->set_lock();
 
+            this->correlate_with_file(tb.get_name(), _pid+1); //first page reserved for bookkeeping
 
             return *p;
         }

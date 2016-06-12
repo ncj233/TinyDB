@@ -35,3 +35,4 @@ build/
 *.swp
 scratchBoard.cc
 scratchBoard.o
+*.txt

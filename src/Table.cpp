@@ -38,12 +38,11 @@ void Table::save(std::fstream & file)
 	delete[] buf;
 }
 
-bool Table::add_attribute(std::string name, int type, int length, bool is_unique)
+void Table::add_attribute(std::string name, DataType type, int length, bool is_unique)
 {
 	if (has_attribute(name))
-		return false;
+		throw(AttributeNameExist());
 	attribute.push_back(Attribute(name, type, length, is_unique));
-	return true;
 }
 
 bool Table::has_attribute(std::string attribute_name)
@@ -56,6 +55,11 @@ bool Table::has_attribute(std::string attribute_name)
 	return false;
 }
 
+std::string Table::get_name()
+{
+	return name;
+}
+
 Attribute & Table::find_attribute(std::string attribute_name)
 {
 	vector<Attribute>::iterator it;
@@ -63,8 +67,7 @@ Attribute & Table::find_attribute(std::string attribute_name)
 		if (it->get_name() == attribute_name)
 			return *it;
 	}
-	assert(0);
-	return *it;
+	throw(AttributeNotExist());
 }
 
 bool Table::has_primary_attribute()
@@ -88,14 +91,39 @@ Attribute & Table::primary_attribute()
 	return *it;
 }
 
-bool Table::set_primary(std::string attribute_name)
+void Table::set_primary(std::string attribute_name)
 {
 	if (!has_attribute(attribute_name))
-		return false;
+		throw(AttributeNotExist());
 	if (has_primary_attribute())
-		return false;
+		throw(HasPrimaryKey());
 	Attribute &attr = find_attribute(attribute_name);
 	attr.set_primary_key();
 	attr.set_unique();
-	return true;
+}
+
+void Table::reset_index(std::string attribute_name)
+{
+	Attribute& attr = find_attribute(attribute_name);
+	attr.reset_index();
+}
+
+void Table::set_index(std::string attribute_name)
+{
+	Attribute& attr = find_attribute(attribute_name);
+	attr.set_index();
+}
+
+vector<std::string> Table::get_all_attribute_name()
+{
+	vector<std::string> all_name;
+	for (vector<Attribute>::iterator it = attribute.begin(); it != attribute.end(); it++)
+		all_name.push_back(it->get_name());
+	return all_name;
+}
+
+AttributeInfo Table::get_attribute_info(std::string attribute_name)
+{
+	Attribute& attr = find_attribute(attribute_name);
+	return attr.get_info();
 }

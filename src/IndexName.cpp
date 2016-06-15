@@ -53,3 +53,8 @@ std::string IndexName::get_attribute_name()
 {
 	return attribute_name;
 }
+
+std::string IndexName::get_index_name()
+{
+	return index_name;
+}

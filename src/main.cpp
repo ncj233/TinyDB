@@ -1,6 +1,7 @@
 #include <chrono>
-#include <vendor/PEGTL/pegtl/input_error.hh>
-#include <vendor/PEGTL/pegtl/parse_error.hh>
+
+#include "vendor/PEGTL/pegtl/input_error.hh"
+#include "vendor/PEGTL/pegtl/parse_error.hh"
 
 #include "src/api/Database.h"
 #include "src/interpreter/Parser.h"
@@ -25,7 +26,7 @@ int main() {
             auto start = chrono::system_clock::now();
             parser.exec(sql.substr(0, sql.find(';') + 1));
             auto end = chrono::system_clock::now();
-            auto duration = static_cast<chrono::duration<double>>(end - start);
+            auto duration = chrono::duration<double>(end - start);
             cerr << "(" << duration.count() << "s)\n";
         } catch (Parser::Quit) {
             cout << "Bye\n";

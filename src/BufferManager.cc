@@ -25,12 +25,63 @@ public:
     const std::string& get_name() { return index_name; };
 };
 
+/*
+   Class Page
+*/
+
+class Page {
+private:
+
+     /*
+      *private member objects
+      * */
+    char * const p;
+    int lock, dirty, pid, last_use_time; //these variables can be manipulated by member functions only
+
+    /*
+     *private member functions
+     * */
+
+public:
+    //static member objects
+    static int capacity;
+
+    //ctors
+    Page();
+
+    //interfaces
+    char getc(int offset) const {
+        return *(p+offset);
+    }
+
+    void set_lock(int mode) {
+        this->lock = mode;
+    }
+
+    int get_lock() const {
+        return this->lock;
+    }
+
+    void set_dirty(int mode) {
+        this->dirty = mode;
+    }
+
+    int get_dirty() const{
+        return this->dirty;
+    }
+
+    int correlate_with_file() const;
+
+};
+
 
 //declarations
 namespace BufferManager {
+
     /*
        Some constants
      */
+
     const int PAGE_SIZE = 4096 * 1024;
 
     const int BUFFER_PAGE_LIMIT = 10;
@@ -40,7 +91,7 @@ namespace BufferManager {
     const int CATALOG_PAGE = 3;
 
     //error code
-    const int CORRELATE_SUCCESS = 2;
+    const int CORRELATE_SUCCESS = 1;
     const int FILE_SIZE_TOO_SMALL = 2;
 
     /*
@@ -48,6 +99,7 @@ namespace BufferManager {
      * */
 
     class comp_page_fctor {
+
     private:
     public:
         bool operator() (const Page *p1, const Page *p2) {
@@ -55,98 +107,56 @@ namespace BufferManager {
         }
     }
 
-    /*
-       Class Page
-    */
-
-    class Page {
-    private:
-
-         /*
-          *private member objects
-          * */
-        char * const p;
-        int lock, dirty;
-        int last_use_time;
-
-        /*
-         *private member functions
-         * */
-        void set_lock() {
-            this->lock = 1;
-        }
-
-        void unset_lock() {
-            this->lock = 0;
-        }
-
-        int correlate_with_file() const;
-
-
-    public:
-        //static member objects
-        static int capacity;
-
-        //ctors
-        Page();
-
-        //interfaces
-        char getc(int offset) const {
-            return *(p+offset);
-        }
-
-    };
 
     /*
        Interfaces for Users
     */
 
     //for table users
-    Page& pull(Table& tb, int pid, int* err_code);
-    Page& create(Table& tb, int user, int* err_code);
-    int commit(Table& tb, int user, int* errcode);
+    const Page& pull(Table& tb, int pid);
+    const Page& create(Table& tb, int user);
+    int commit(Table& tb, int user);
 
     //for index users
-    //Page& pull(Index& idx, int pid, int* err_code);
-    //Page& create(Index& idx, int user, int* err_code);
+    //const Page& pull(Index& idx, int pid, int* err_code);
+    //const Page& create(Index& idx, int user, int* err_code);
     //int commit(Index& idx, int user, int* errcode);
 
     //for catalog users
-    //Page& pull(int pid, int* err_code);
-    //Page& create(int user, int* err_code);
+    //const Page& pull(int pid, int* err_code);
+    //const Page& create(int user, int* err_code);
     //int commit(int user, int* errcode);
 
     /*
         Internal ultilities
      */
+    class BMExcep {
+        private:
+            int err_code;
+        public:
+            BMExcep(int ec): err_code(ec) {};
+    }
 }
 
 
-
-namespace BufferManager
-{
+namespace <{1:BufferManager}> {
 
     /*
         Definitions of some  maintainers
      */
 
-    std::priority_queue<int, std::vector<Page*>, >
+    std::priority_queue<int, std::vector<Page*>, comp_page_fctor>
+    std::map<std::string, std::map<int, Page&>& >& file_container = *(new std::map<std::string, std::map<int, Page&>& >);
+    int& current_page_num = *(new int(0));
 
-    std::map<int, Page*>& table_page_map = *(new std::map<int, Page*>());
-    std::map<int, Page*>& index_page_map = *(new std::map<int, Page*>());
-    std::map<int, Page*>& catalog_page_map = *(new std::map<int, Page*>());
-
-    int& current_table_page_num = *(new int(0));
-    int& current_index_page_num = *(new int(0));
-    int& current_catalog_page_num = *(new int(0));
-
-    //Definition of static members
+    /*
+     *Definition of class Page
+     * */
     int Page::capacity = PAGE_SIZE; //4KB
 
-    //Definition of class Page
-    Page::Page(): p(new char[PAGE_SIZE]()), lock(0), dirty(0), last_use_time(-1) {};
+    Page::Page(): p(new char[PAGE_SIZE]()), lock(0), dirty(0), pid(-1), last_use_time(-1) {};
 
-    int correlate_with_file(const string& file_name, int pid) const {
+    Page::int correlate_with_file(const string& file_name, int pid) const {
         int return_code = CORRELATE_SUCCESS;
         std::ifstream ifs(file_name.c_str(), std::ios::in | std::ios::binary);
 
@@ -163,26 +173,36 @@ namespace BufferManager
         return return_code;
     }
 
-    //Definition of interfaces
-    //Page::Page& pull(Table& tb, int pid, int*err_code) {
+    /*
+     * Definitions of interface
+     * */
 
+
+    //const Page::Page& pull(Table& tb, int pid, int*err_code) {
     //}
 
-    Page& create(Table& tb, int _pid, int *err_code) {
-        if (current_table_page_num < BUFFER_PAGE_LIMIT) {
-            Page& new_page = *(new Page(tb.get_name());
-            new_page->set_lock();
+    const Page& create(Table& tb, int _pid) {
+        if (current_page_num < BUFFER_PAGE_LIMIT) {
+            Page& new_page = *(new Page());
+            new_page.set_lock();
 
-            this->correlate_with_file(tb.get_name(), _pid+1); //first page reserved for bookkeeping
+            int err_code = new_page.correlate_with_file(tb.get_name(), _pid);
+            if (err_code == CORRELATE_SUCCESS) {
+                table_page_map.insert(new_page.pid)
+            }
+            else {
+                throw BMExcep(err_code);
+            }
 
-            return *p;
+            return new_page;
         }
-        else {
-            //do some swap
+        else { //need to do some swap (kick the least-recently-used page)
+
         }
     }
 
 }
+
 
 //debug
 int main() {

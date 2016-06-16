@@ -293,15 +293,8 @@ namespace TinyDB { namespace PEG {
 
     template<> struct action<select_star_from> {
         static void apply(const action_input &in, ParserState &state) {
-            auto table = state.db.select(state.table_name, state.cmp_vec);
+            state.db.print_table(state.table_name, state.db.select(state.table_name, state.cmp_vec));
             state.cmp_vec.clear();
-
-            for (const auto& vec : table) {
-                for (const auto& item : vec) {
-                    std::cout << "\t" << item;
-                }
-                std::cout << std::endl;
-            }
         }
     };
 

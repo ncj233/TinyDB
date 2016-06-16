@@ -16,16 +16,20 @@ namespace TinyDB {
         : catalog_manager(std::make_unique<CatalogManager>()),
           record_manager(std::make_unique<RecordManager>()) {}
 
+        using Table = std::vector<std::vector<std::string>>;
+
         void create_table(std::string table_name);
         void drop_table(std::string table_name);
         void create_index(std::string index_name, std::string table_name, std::string column_name);
         void drop_index(std::string index_name);
-        std::vector<std::vector<std::string>> select(std::string table_name, std::vector<Comparison> comparisons);
+        Table select(std::string table_name, std::vector<Comparison> comparisons);
         void insert_into(std::string table_name, std::vector<std::string> values);
         void delete_from(std::string table_name, std::vector<Comparison> comparisons);
 
         void add_column(std::string table_name, std::string column_name, DataType type, int size, bool is_unique);
         void set_primary(std::string table_name, std::string column_name);
+
+        void print_table(std::string table_name, Table &&table);
 
         class NumberOfValuesError : std::exception {};
         class SizeOfCharError : std::exception {};

@@ -4,12 +4,18 @@
 
 #include "Database.h"
 
+#include <iomanip>
+
 using namespace TinyDB;
 using namespace std;
 
 static void format(string &str, int len) {
     if (str.size() < len) str += string(len - str.size(), ' ');
     else str = str.substr(0, static_cast<size_t>(len));
+}
+
+static string nospace(string str) {
+    return str.substr(0, str.find(' '));
 }
 
 void Database::create_table(string table_name) {
@@ -34,7 +40,7 @@ void Database::drop_index(string index_name) {
     catalog_manager->drop_index(index_name);
 }
 
-vector<vector<string>> Database::select(string table_name, vector<Comparison> comparisons) {
+Database::Table Database::select(string table_name, vector<Comparison> comparisons) {
     auto columns = catalog_manager->get_all_attribute_info(table_name);
     for (auto &cmp : comparisons) {
         auto info = catalog_manager->get_attribute_info(table_name, cmp.parameter);
@@ -67,4 +73,39 @@ void Database::add_column(string table_name, string column_name, DataType type, 
 
 void Database::set_primary(string table_name, string column_name) {
     catalog_manager->set_primary(table_name, column_name);
+}
+
+void Database::print_table(string table_name, Database::Table &&table) {
+    auto columns = catalog_manager->get_all_attribute_info(table_name);
+    auto widths = vector<size_t>(columns.size());
+    for (const auto &vec : table) {
+        for (auto i = 0; i < vec.size(); i++) {
+            auto size = nospace(vec[i]).size();
+            if (size > widths[i]) widths[i] = size;
+        }
+    }
+
+    auto print_line = [&widths]() {
+        for (const auto &width : widths) {
+            cout << "+";
+            cout << string(width + 2, '-');
+        }
+        cout << "+\n";
+    };
+
+    print_line();
+    for (auto i = 0; i < columns.size(); i++) {
+        cout << "|";
+        cout << setw(widths[i] + 1) << columns[i].name << " ";
+    }
+    cout << "|\n";
+    print_line();
+    for (const auto &vec: table) {
+        for (auto i = 0; i < vec.size(); i++) {
+            cout << "|";
+            cout << setw(widths[i] + 1) << nospace(vec[i]) << " ";
+        }
+        cout << "|\n";
+    }
+    print_line();
 }

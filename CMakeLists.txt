@@ -3,5 +3,12 @@ project(TinyDB)
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++14")
 
-set(SOURCE_FILES src/main.cpp)
-add_executable(TinyDB ${SOURCE_FILES})
+include_directories(${PROJECT_SOURCE_DIR})
+
+file(GLOB TINYDB_SOURCE_FILES
+    "src/*/*.h"
+    "src/*/*.cpp"
+    "src/*/*.cc"
+)
+
+add_executable(TinyDB src/main.cpp ${TINYDB_SOURCE_FILES})

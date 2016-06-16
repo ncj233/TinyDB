@@ -2,9 +2,9 @@
 
 #include <iostream>
 #include <fstream>
+#include <string>
 #include <vector>
 #include "Attribute.h"
-#include <assert.h>
 
 class Table
 {
@@ -35,4 +35,3 @@ private:
 	std::string name;
 	std::vector<Attribute> attribute;
 };
-

@@ -6,13 +6,13 @@ RecordManager::RecordManager()
 {
 }
 
-void RecordManager::createTable(std::string table_name)
+void RecordManager::create_table(std::string table_name)
 {
 	fstream file(table_name + string(".table"), ios::binary | ios::out);
 	file << int(0);
 }
 
-void RecordManager::dropTable(std::string table_name)
+void RecordManager::drop_table(std::string table_name)
 {
 	string file_name = table_name + string(".table");
 	remove(file_name.c_str());

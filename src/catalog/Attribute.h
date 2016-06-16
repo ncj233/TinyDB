@@ -2,7 +2,6 @@
 #include <iostream>
 #include <fstream>
 #include <string>
-//#include <cstdio>
 
 enum class DataType {
 	Integer, Real, Character

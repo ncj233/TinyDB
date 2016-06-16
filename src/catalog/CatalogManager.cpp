@@ -1,4 +1,5 @@
 #include "CatalogManager.h"
+#include <cassert>
 
 using namespace std;
 

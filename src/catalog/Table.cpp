@@ -1,4 +1,5 @@
 #include "Table.h"
+#include <cassert>
 
 using namespace std;
 
@@ -23,9 +24,8 @@ Table::Table(std::string table_name)
 void Table::save(std::fstream & file)
 {
 	char *buf = new char[64];
-	int len = name.length();
 	const char *str = name.c_str();
-	strncpy_s(buf, len + 1, str, 64);
+	strncpy(buf, str, 64);
 	file.write(buf, 64);
 
 	file.put((char)attribute.size());

@@ -1,9 +1,5 @@
 #include "IndexName.h"
 
-
-
-
-
 IndexName::IndexName(std::fstream & file)
 {
 	char *buf = new char[64 * 3];
@@ -24,17 +20,13 @@ IndexName::IndexName(std::string index_name, std::string table_name, std::string
 void IndexName::save(std::fstream & file)
 {
 	char *buf = new char[64 * 3];
-	int len;
 	const char *str;
-	len = index_name.length();
 	str = index_name.c_str();
-	strncpy_s(buf, len + 1, str, 64);
-	len = table_name.length();
+	strncpy(buf, str, 64);
 	str = table_name.c_str();
-	strncpy_s(buf + 64, len + 1, str, 64);
-	len = attribute_name.length();
+	strncpy(buf + 64, str, 64);
 	str = attribute_name.c_str();
-	strncpy_s(buf + 128, len + 1, str, 64);
+	strncpy(buf + 128, str, 64);
 	file.write(buf, 192);
 	delete[]buf;
 }

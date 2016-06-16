@@ -1,7 +1,7 @@
 #pragma once
 #include <iostream>
 #include <fstream>
-#include <cstdio>
+#include <string>
 
 class IndexName
 {
@@ -20,4 +20,3 @@ private:
 	std::string table_name;
 	std::string attribute_name;
 };
-

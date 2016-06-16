@@ -2,10 +2,9 @@
 
 #include <iostream>
 #include <fstream>
+#include <exception>
 #include "Table.h"
 #include "IndexName.h"
-#include <assert.h>
-#include <exception>
 
 class CatalogManager
 {
@@ -20,8 +19,8 @@ public:
 	void set_primary(std::string table_name, std::string attribute_name);
 	void drop_table(std::string table_name);
 	void drop_index(std::string index_name);
-	std::vector<std::string> get_attribute_name(std::string table_name);
 
+	std::vector<std::string> get_attribute_name(std::string table_name);
 	std::vector<std::string> all_index_on_table(std::string table_name);
 	AttributeInfo get_attribute_info(std::string table_name, std::string attribute_name);
 	std::vector<AttributeInfo> get_all_attribute_info(std::string table_name);
@@ -40,4 +39,3 @@ private:
 	std::vector<Table> table;
 	std::vector<IndexName> index;
 };
-

@@ -1,6 +1,5 @@
 #include "Attribute.h"
 
-
 Attribute::Attribute(std::fstream& file)
 {
 	char *buf = new char[67];
@@ -31,9 +30,9 @@ Attribute::Attribute(std::string name, DataType type, int length, bool is_unique
 void Attribute::save(std::fstream& file)
 {
 	char *buf = new char[67];
-	int len = name.length();
+	size_t len = name.length();
 	const char *str = name.c_str();
-	strncpy_s(buf, len+1, str, 64);
+	strncpy(buf, str, 64);
 	buf[len] = 0;
 	buf[64] = (char)type;
 	buf[65] = (char)length;
@@ -109,5 +108,3 @@ AttributeInfo Attribute::get_info()
 {
 	return AttributeInfo(name, type, length, has_index());
 }
-
-

@@ -61,6 +61,24 @@ void RecordManager::insert_into(std::string table_name, std::vector<std::string>
 	}
 }
 
+vector<vector<string>> RecordManager::select(string table_name, vector<Comparison> comp, vector<AttributeInfo> info)
+{
+	vector<int> all_tid = select_tid(table_name, comp, info);
+	vector<vector<string>> table;
+	for (vector<int>::iterator it = all_tid.begin(); it != all_tid.end(); it++) {
+		table.push_back(get_tuple(table_name, *it, info));
+	}
+	return table;
+}
+
+void RecordManager::delete_from(string table_name, vector<Comparison> comp, vector<AttributeInfo> info)
+{
+	vector<int> all_tid = select_tid(table_name, comp, info);
+	for (vector<int>::iterator it = all_tid.begin(); it != all_tid.end(); it++) {
+		delete_tuple(table_name, *it, info);
+	}
+}
+
 bool RecordManager::compare(string parameter, Operation opt, string operand, DataType type)
 {
 	bool ans;
@@ -174,6 +192,41 @@ vector<string> RecordManager::get_tuple(string table_name, int tid, vector<Attri
 		}
 	}
 	return tuple;
+}
+
+vector<int> RecordManager::select_tid(string table_name, vector<Comparison> comp, vector<AttributeInfo> info)
+{
+	vector<int> has_select;
+	int tuple_num = get_tid_num(table_name);
+	for (int i = 0; i < tuple_num; i++) {
+		vector<string> tuple = get_tuple(table_name, i, info);
+		if (tuple.size() == 0)
+			continue;
+		if (check_tuple(tuple, comp, info))
+			has_select.push_back(i);
+	}
+	return has_select;
+}
+
+bool RecordManager::check_tuple(vector<string> tuple, vector<Comparison> comp, vector<AttributeInfo> info)
+{
+	vector<Comparison>::iterator it;
+	for (it = comp.begin(); it != comp.end(); it++) {
+		int num = get_info_num(it->parameter, info);
+		if (!compare(tuple[num], it->opt, it->operand, info[num].type))
+			return false;
+	}
+
+	return true;
+}
+
+int RecordManager::get_info_num(string attribute_name, vector<AttributeInfo> info)
+{
+	int size = info.size();
+	for (int i = 0; i < size; i++)
+		if (attribute_name == info[i].name)
+			return i;
+	throw (AttributeInfoNotFound());
 }
 
 void RecordManager::delete_tuple(string table_name, int tid, vector<AttributeInfo> info)

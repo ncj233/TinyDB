@@ -28,14 +28,18 @@ public:
 	void createTable(std::string table_name);
 	void dropTable(std::string table_name);
 	void insert_into(std::string table_name, std::vector<std::string> elements, vector<AttributeInfo> info);
-	//vector<vector<string>> select(string table_name, vector<Comparison> comp, vector<AttributeInfo> info);
-	//void delete_from(string table_name, vector<Comparison> comp, vector<AttributeInfo> info);
+	vector<vector<string>> select(string table_name, vector<Comparison> comp, vector<AttributeInfo> info);
+	void delete_from(string table_name, vector<Comparison> comp, vector<AttributeInfo> info);
 
 	class ItemsNumberNotEq : public std::exception {};
+	class AttributeInfoNotFound : public std::exception {};
 
-//private:
+private:
 	bool compare(string parameter, Operation opt, string operand, DataType type);
 	vector<string> get_tuple(string table_name, int tid, vector<AttributeInfo> info);
+	vector<int> select_tid(string table_name, vector<Comparison> comp, vector<AttributeInfo> info);
+	bool check_tuple(vector<string> tuple, vector<Comparison> comp, vector<AttributeInfo> info);
+	int get_info_num(string attribute_name, vector<AttributeInfo> info);
 	void delete_tuple(string table_name, int tid, vector<AttributeInfo> info);
 	int get_new_tid(string table_name);
 	int get_tid_num(string table_name);

@@ -13,7 +13,7 @@ using namespace TinyDB;
 using namespace pegtl;
 
 // Parser Rules
-namespace TinyDB {
+namespace TinyDB { namespace PEG {
 
     template <typename T>
     struct padding
@@ -38,6 +38,9 @@ namespace TinyDB {
 
     struct value
         : sor<integer, real, character> {};
+
+    struct insert_value
+        : value {};
 
 
     struct integer_type
@@ -77,21 +80,23 @@ namespace TinyDB {
     struct column_list
         : list<sor<column_item, primary_key>, padding<one<','>>> {};
 
+    struct string_create_table
+        : seq<padding<pegtl_istring_t("CREATE")>, padding<pegtl_istring_t("TABLE")>> {};
+
 
     struct comparison_operator
         : sor<one<'='>, istring<'<', '>'>, istring<'!', '='>,
               one<'<'>, one<'>'>, istring<'<', '='>, istring<'>', '='>> {};
 
     struct comparison
-        : seq<padding<column_name>, padding<comparison>, padding<value>> {};
+        : seq<padding<column_name>, padding<comparison_operator>, padding<value>> {};
 
     struct condition
         : seq<padding<pegtl_istring_t("WHERE")>, list<comparison, padding<pegtl_istring_t("AND")>>> {};
 
 
     struct create_table
-        : seq<padding<pegtl_istring_t("CREATE")>, padding<pegtl_istring_t("TABLE")>,
-              parentheses<column_list>> {};
+        : seq<string_create_table, parentheses<column_list>> {};
 
     struct drop_table
         : seq<padding<pegtl_istring_t("DROP")>, padding<pegtl_istring_t("TABLE")>,
@@ -113,7 +118,7 @@ namespace TinyDB {
     struct insert_into
         : if_must<padding<pegtl_istring_t("INSERT")>, padding<pegtl_istring_t("INTO")>,
                   padding<table_name>, padding<pegtl_istring_t("VALUES")>,
-                  parentheses<list<padding<value>, padding<one<','>>>>> {};
+                  parentheses<list<padding<insert_value>, padding<one<','>>>>> {};
 
     struct delete_from
         : if_must<padding<pegtl_istring_t("DELETE")>, padding<pegtl_istring_t("FROM")>,
@@ -133,7 +138,8 @@ namespace TinyDB {
     struct execfile
         : if_must<padding<pegtl_istring_t("execfile")>, padding<character>> {};
 
-}
+} }
+
 
 namespace TinyDB {
 
@@ -142,60 +148,58 @@ namespace TinyDB {
         ParserState(Database &db)
         : db(db) {};
 
-        enum class DataType {
-            Integer, Real, Character
-        };
-
         Database &db;
-        std::string integer, real, character;
+        std::string value;
+        std::vector<std::string> inserted_values;
         DataType data_type;
         std::string table_name, index_name, column_name;
-        bool unique;
-        std::string cmp_op;
+        bool is_unique;
+        Operation cmp_op;
+        std::vector<Comparison> cmp_vec;
     };
 
 }
 
 // Parser Actions
-namespace TinyDB {
+namespace TinyDB { namespace PEG {
 
     template<typename Rule>
     struct action: nothing<Rule> {};
 
     template<> struct action<integer> {
         static void apply(const action_input &in, ParserState &state) {
-            state.integer = in.string();
+            state.value = in.string();
         }
     };
 
     template<> struct action<real> {
         static void apply(const action_input &in, ParserState &state) {
-            state.real = in.string();
+            state.value = in.string();
         }
     };
 
     template<> struct action<character> {
         static void apply(const action_input &in, ParserState &state) {
-            state.character = in.string().substr(1, in.string().size() - 2);
+            state.value = in.string().substr(1, in.string().size() - 2);
         }
     };
 
 
     template<> struct action<integer_type> {
         static void apply(const action_input &in, ParserState &state) {
-            state.data_type = ParserState::DataType::Integer;
+            state.data_type = DataType::Integer;
         }
     };
 
     template<> struct action<real_type> {
         static void apply(const action_input &in, ParserState &state) {
-            state.data_type = ParserState::DataType::Real;
+            state.data_type = DataType::Real;
         }
     };
 
     template<> struct action<character_type> {
         static void apply(const action_input &in, ParserState &state) {
-            state.data_type = ParserState::DataType::Character;
+            state.data_type = DataType::Character;
         }
     };
 
@@ -221,21 +225,86 @@ namespace TinyDB {
 
     template<> struct action<column_unique> {
         static void apply(const action_input &in, ParserState &state) {
-            state.unique = true;
+            state.is_unique = true;
         }
     };
 
     template<> struct action<column_item> {
         static void apply(const action_input &in, ParserState &state) {
-            // Add column (column_name, data_type, unique)
-            state.unique = false;
+            auto size = 0;
+            if (state.data_type == DataType::Character) size = stoi(state.value);
+            state.db.add_column(state.table_name, state.column_name, state.data_type, size, state.is_unique);
+            state.is_unique = false;
+        }
+    };
+
+    template<> struct action<string_create_table> {
+        static void apply(const action_input &in, ParserState &state) {
+            state.db.create_table(state.table_name);
         }
     };
 
 
     template<> struct action<comparison_operator> {
         static void apply(const action_input &in, ParserState &state) {
-            state.cmp_op = in.string();
+            if (in.string() == "=") state.cmp_op = Operation::eq;
+            if (in.string() == "<>") state.cmp_op = Operation::ne;
+            if (in.string() == "!=") state.cmp_op = Operation::ne;
+            if (in.string() == "<") state.cmp_op = Operation::lt;
+            if (in.string() == ">") state.cmp_op = Operation::gt;
+            if (in.string() == "<=") state.cmp_op = Operation::le;
+            if (in.string() == ">=") state.cmp_op = Operation::ge;
+        }
+    };
+
+    template<> struct action<comparison> {
+        static void apply(const action_input &in, ParserState &state) {
+            state.cmp_vec.emplace_back(state.column_name, state.cmp_op, state.value);
+        }
+    };
+
+
+    template<> struct action<insert_value> {
+        static void apply(const action_input &in, ParserState &state) {
+            state.inserted_values.push_back(in.string());
+        }
+    };
+
+
+    template<> struct action<drop_table> {
+        static void apply(const action_input &in, ParserState &state) {
+            state.db.drop_table(state.table_name);
+        }
+    };
+
+    template<> struct action<create_index> {
+        static void apply(const action_input &in, ParserState &state) {
+            state.db.create_index(state.index_name, state.table_name, state.column_name);
+        }
+    };
+
+    template<> struct action<drop_index> {
+        static void apply(const action_input &in, ParserState &state) {
+            state.db.drop_index(state.index_name);
+        }
+    };
+
+    template<> struct action<select_star_from> {
+        static void apply(const action_input &in, ParserState &state) {
+            state.db.select(state.table_name, state.cmp_vec);
+            state.cmp_vec.clear();
+        }
+    };
+
+    template<> struct action<insert_into> {
+        static void apply(const action_input &in, ParserState &state) {
+            state.db.insert_into(state.table_name, state.inserted_values);
+        }
+    };
+
+    template<> struct action<delete_from> {
+        static void apply(const action_input &in, ParserState &state) {
+            state.db.delete_from(state.table_name, state.cmp_vec);
         }
     };
 
@@ -248,23 +317,17 @@ namespace TinyDB {
 
     template<> struct action<execfile> {
         static void apply(const action_input &in, ParserState &state) {
-            auto filename = state.character;
+            auto filename = state.value;
             throw Parser::Execfile(filename);
         }
     };
 
-//    template<> struct action<> {
-//        static void apply(const action_input &in, ParserState &state) {
-//
-//        }
-//    };
-
-}
+} }
 
 void Parser::exec(std::istream &stream) {
     ParserState state(db);
     try {
-        parse_istream<statements, action>(stream, "", SIZE_T_MAX, state);
+        parse_istream<PEG::statements, PEG::action>(stream, "", SIZE_T_MAX, state);
     } catch (Execfile &e) {
         std::ifstream f(e.filename);
         exec(f);

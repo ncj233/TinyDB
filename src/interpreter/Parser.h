@@ -8,15 +8,15 @@
 #include <string>
 #include <exception>
 
-namespace TinyDB {
+#include "src/api/Database.h"
 
-    class Database {};
+namespace TinyDB {
 
     class Parser {
     public:
         Parser(Database &db) : db(db) {};
 
-        void exec(std::istream &);
+        void exec(std::istream &stream);
 
         class Execfile: public std::exception {
         public:

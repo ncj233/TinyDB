@@ -123,6 +123,12 @@ AttributeInfo CatalogManager::get_attribute_info(std::string table_name, std::st
 	return table.get_attribute_info(attribute_name);
 }
 
+std::vector<AttributeInfo> CatalogManager::get_all_attribute_info(std::string table_name)
+{
+	Table & t = find_table(table_name);
+	return t.get_all_attribute_info();
+}
+
 bool CatalogManager::has_table(std::string name)
 {
 	for (vector<Table>::iterator it = table.begin(); it != table.end(); it++) {

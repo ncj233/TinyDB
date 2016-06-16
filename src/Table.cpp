@@ -100,6 +100,7 @@ void Table::set_primary(std::string attribute_name)
 	Attribute &attr = find_attribute(attribute_name);
 	attr.set_primary_key();
 	attr.set_unique();
+	attr.set_index();
 }
 
 void Table::reset_index(std::string attribute_name)
@@ -126,4 +127,14 @@ AttributeInfo Table::get_attribute_info(std::string attribute_name)
 {
 	Attribute& attr = find_attribute(attribute_name);
 	return attr.get_info();
+}
+
+std::vector<AttributeInfo> Table::get_all_attribute_info()
+{
+	vector<AttributeInfo> all_info;
+	vector<Attribute>::iterator it;
+	for (it = attribute.begin(); it != attribute.end(); it++) {
+		all_info.push_back(it->get_info());
+	}
+	return all_info;
 }

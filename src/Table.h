@@ -22,6 +22,7 @@ public:
 	void set_index(std::string attribute_name);
 	std::vector<std::string> get_all_attribute_name();
 	AttributeInfo get_attribute_info(std::string attribute_name);
+	std::vector<AttributeInfo> get_all_attribute_info();
 
 	class AttributeNameExist : public std::exception {};
 	class AttributeNotExist : public std::exception {};

@@ -27,6 +27,9 @@ namespace TinyDB {
         void add_column(std::string table_name, std::string column_name, DataType type, int size, bool is_unique);
         void set_primary(std::string table_name, std::string column_name);
 
+        class NumberOfValuesError : std::exception {};
+        class SizeOfCharError : std::exception {};
+
     private:
         std::unique_ptr<CatalogManager> catalog_manager;
         std::unique_ptr<RecordManager> record_manager;

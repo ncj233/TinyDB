@@ -5,6 +5,7 @@
 #ifndef TINYDB_PARSER_H
 #define TINYDB_PARSER_H
 
+#include <iostream>
 #include <string>
 #include <exception>
 
@@ -16,14 +17,17 @@ namespace TinyDB {
     public:
         Parser(Database &db) : db(db) {};
 
-        void exec(std::istream &stream);
+        void exec(std::string &&sql);
+        void execfile(std::string &&filename);
 
-        class Execfile: public std::exception {
+//        void exec(std::istream &stream);
+
+        class Execfile : public std::exception {
         public:
             Execfile(std::string filename) : filename(filename) {};
             std::string filename;
         };
-        class Quit: public std::exception {};
+        class Quit : public std::exception {};
 
     private:
         Database &db;

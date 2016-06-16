@@ -24,20 +24,17 @@ namespace TinyDB { namespace PEG {
         : if_must<padding<one<'('>>, padding<T>, padding<one<')'>>> {};
 
 
-    struct number
-        : plus<digit> {};
+    struct real
+        : seq<opt<one<'+', '-'>>, plus<digit>, one<'.'>, plus<digit>> {};
 
     struct integer
-        : seq<opt<one<'+', '-'>>, number> {};
-
-    struct real
-        : seq<integer, opt<seq<one<'.'>, number>>> {};
+        : seq<opt<one<'+', '-'>>, plus<digit>> {};
 
     struct character
         : if_must<one<'\''>, star<not_one<'\''>>, one<'\''>> {};
 
     struct value
-        : sor<integer, real, character> {};
+        : sor<real, integer, character> {};
 
     struct insert_value
         : value {};
@@ -51,7 +48,7 @@ namespace TinyDB { namespace PEG {
 
     struct character_type
         : if_must<padding<sor<pegtl_istring_t("char"), pegtl_istring_t("character")>>,
-                  parentheses<number>> {};
+                  parentheses<integer>> {};
 
     struct data_type
         : sor<integer_type, real_type, character_type> {};
@@ -80,13 +77,13 @@ namespace TinyDB { namespace PEG {
     struct column_list
         : list<sor<column_item, primary_key>, padding<one<','>>> {};
 
-    struct string_create_table
-        : seq<padding<pegtl_istring_t("CREATE")>, padding<pegtl_istring_t("TABLE")>> {};
+    struct create_table_name
+        : seq<padding<pegtl_istring_t("CREATE")>, padding<pegtl_istring_t("TABLE")>, padding<table_name>> {};
 
 
     struct comparison_operator
         : sor<one<'='>, istring<'<', '>'>, istring<'!', '='>,
-              one<'<'>, one<'>'>, istring<'<', '='>, istring<'>', '='>> {};
+              istring<'<', '='>, istring<'>', '='>, one<'<'>, one<'>'>> {};
 
     struct comparison
         : seq<padding<column_name>, padding<comparison_operator>, padding<value>> {};
@@ -96,7 +93,7 @@ namespace TinyDB { namespace PEG {
 
 
     struct create_table
-        : seq<string_create_table, parentheses<column_list>> {};
+        : seq<create_table_name, parentheses<opt<column_list>>> {};
 
     struct drop_table
         : seq<padding<pegtl_istring_t("DROP")>, padding<pegtl_istring_t("TABLE")>,
@@ -112,31 +109,30 @@ namespace TinyDB { namespace PEG {
               padding<index_name>> {};
 
     struct select_star_from
-        : if_must<padding<pegtl_istring_t("SELECT")>, padding<one<'*'>>,
-                  padding<pegtl_istring_t("FROM")>, padding<table_name>, opt<condition>> {};
+        : seq<padding<pegtl_istring_t("SELECT")>, padding<one<'*'>>,
+              padding<pegtl_istring_t("FROM")>, padding<table_name>, opt<condition>> {};
 
     struct insert_into
-        : if_must<padding<pegtl_istring_t("INSERT")>, padding<pegtl_istring_t("INTO")>,
-                  padding<table_name>, padding<pegtl_istring_t("VALUES")>,
-                  parentheses<list<padding<insert_value>, padding<one<','>>>>> {};
+        : seq<padding<pegtl_istring_t("INSERT")>, padding<pegtl_istring_t("INTO")>,
+              padding<table_name>, padding<pegtl_istring_t("VALUES")>,
+              parentheses<list<padding<insert_value>, padding<one<','>>>>> {};
 
     struct delete_from
-        : if_must<padding<pegtl_istring_t("DELETE")>, padding<pegtl_istring_t("FROM")>,
-                  padding<table_name>, opt<condition>> {};
-
-    struct statement
-        : must<sor<create_table, drop_table, create_index, drop_index,
-                   select_star_from, insert_into, delete_from>> {};
-
-    struct statements
-        : star<seq<statement, padding<one<';'>>>> {};
-
+        : seq<padding<pegtl_istring_t("DELETE")>, padding<pegtl_istring_t("FROM")>,
+              padding<table_name>, opt<condition>> {};
 
     struct quit
         : padding<pegtl_istring_t("quit")> {};
 
     struct execfile
         : if_must<padding<pegtl_istring_t("execfile")>, padding<character>> {};
+
+    struct statement
+        : must<sor<create_table, drop_table, create_index, drop_index,
+                   select_star_from, insert_into, delete_from, quit, execfile>> {};
+
+    struct statements
+        : star<seq<statement, padding<one<';'>>>> {};
 
 } }
 
@@ -166,13 +162,13 @@ namespace TinyDB { namespace PEG {
     template<typename Rule>
     struct action: nothing<Rule> {};
 
-    template<> struct action<integer> {
+    template<> struct action<real> {
         static void apply(const action_input &in, ParserState &state) {
             state.value = in.string();
         }
     };
 
-    template<> struct action<real> {
+    template<> struct action<integer> {
         static void apply(const action_input &in, ParserState &state) {
             state.value = in.string();
         }
@@ -229,6 +225,12 @@ namespace TinyDB { namespace PEG {
         }
     };
 
+    template<> struct action<primary_key> {
+        static void apply(const action_input &in, ParserState &state) {
+            state.db.set_primary(state.table_name, state.column_name);
+        }
+    };
+
     template<> struct action<column_item> {
         static void apply(const action_input &in, ParserState &state) {
             auto size = 0;
@@ -238,7 +240,7 @@ namespace TinyDB { namespace PEG {
         }
     };
 
-    template<> struct action<string_create_table> {
+    template<> struct action<create_table_name> {
         static void apply(const action_input &in, ParserState &state) {
             state.db.create_table(state.table_name);
         }
@@ -266,7 +268,7 @@ namespace TinyDB { namespace PEG {
 
     template<> struct action<insert_value> {
         static void apply(const action_input &in, ParserState &state) {
-            state.inserted_values.push_back(in.string());
+            state.inserted_values.push_back(state.value);
         }
     };
 
@@ -291,14 +293,22 @@ namespace TinyDB { namespace PEG {
 
     template<> struct action<select_star_from> {
         static void apply(const action_input &in, ParserState &state) {
-            state.db.select(state.table_name, state.cmp_vec);
+            auto table = state.db.select(state.table_name, state.cmp_vec);
             state.cmp_vec.clear();
+
+            for (const auto& vec : table) {
+                for (const auto& item : vec) {
+                    std::cout << "\t" << item;
+                }
+                std::cout << std::endl;
+            }
         }
     };
 
     template<> struct action<insert_into> {
         static void apply(const action_input &in, ParserState &state) {
             state.db.insert_into(state.table_name, state.inserted_values);
+            state.inserted_values.clear();
         }
     };
 
@@ -324,12 +334,28 @@ namespace TinyDB { namespace PEG {
 
 } }
 
-void Parser::exec(std::istream &stream) {
+
+void Parser::exec(std::string &&sql) {
     ParserState state(db);
     try {
-        parse_istream<PEG::statements, PEG::action>(stream, "", SIZE_T_MAX, state);
+        parse_string<PEG::statements, PEG::action>(sql, "SQL", state);
     } catch (Execfile &e) {
-        std::ifstream f(e.filename);
-        exec(f);
+        execfile(std::move(e.filename));
     }
 }
+
+void Parser::execfile(std::string &&filename) {
+    ParserState state(db);
+    parse_file<PEG::statements, PEG::action>(filename, state);
+}
+
+
+//void Parser::exec(std::istream &stream) {
+//    ParserState state(db);
+//    try {
+//        parse_istream<PEG::statements, PEG::action>(stream, "SQL", SIZE_T_MAX, state);
+//    } catch (Execfile &e) {
+//        std::ifstream f(e.filename);
+//        exec(f);
+//    }
+//}

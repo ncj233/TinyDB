@@ -86,6 +86,7 @@ void CatalogManager::drop_table(std::string table_name)
 	for (vector<Table>::iterator it = table.begin(); it != table.end(); it++) {
 		if (table_name == it->get_name()) {
 			table.erase(it);
+			return;
 		}
 	}
 }
@@ -99,6 +100,7 @@ void CatalogManager::drop_index(std::string index_name)
 			Table & table = find_table(it->get_table_name());
 			table.reset_index(it->get_attribute_name());
 			index.erase(it);
+			return;
 		}
 	}
 }

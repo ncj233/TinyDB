@@ -1,212 +1,155 @@
 #include <iostream>
-#include <memory>
 #include <fstream>
 #include <string>
-#include <ctime>
 #include <map>
-#include <vector>
+#include <utility>
+
+#include <cstring>
+
+#include "BufferManager.h"
 
 /*
  *for debug
  * */
 class Table {
-private:
-    std::string table_name;
-public:
-    Table(const std::string& tb_name): table_name(tb_name) {};
-    const std::string& get_name() { return table_name; };
+	private:
+		std::string table_name;
+	public:
+		Table(const std::string& tb_name): table_name(tb_name) {};
+		const std::string& get_name() { return table_name; };
 };
 
 class Index {
-private:
-    std::string index_name;
-public:
-    Index(const std::string& idx_name): index_name(idx_name) {};
-    const std::string& get_name() { return index_name; };
+	private:
+		std::string index_name;
+	public:
+		Index(const std::string& idx_name): index_name(idx_name) {};
+		const std::string& get_name() { return index_name; };
 };
 
-/*
-   Class Page
-*/
-
-class Page {
-private:
-
-     /*
-      *private member objects
-      * */
-    char * const p;
-    int lock, dirty, pid, last_use_time; //these variables can be manipulated by member functions only
-
-    /*
-     *private member functions
-     * */
-
-public:
-    //static member objects
-    static int capacity;
-
-    //ctors
-    Page();
-
-    //interfaces
-    char getc(int offset) const {
-        return *(p+offset);
-    }
-
-    void set_lock(int mode) {
-        this->lock = mode;
-    }
-
-    int get_lock() const {
-        return this->lock;
-    }
-
-    void set_dirty(int mode) {
-        this->dirty = mode;
-    }
-
-    int get_dirty() const{
-        return this->dirty;
-    }
-
-    int correlate_with_file() const;
-
-};
-
-
-//declarations
+//definitions
 namespace BufferManager {
 
-    /*
-       Some constants
-     */
+	/*
+	   Definitions of some  maintainers
+	 */
 
-    const int PAGE_SIZE = 4096 * 1024;
+	std::map<std::string, Page*> page_cache_pool;
 
-    const int BUFFER_PAGE_LIMIT = 10;
+	/*
+	 *Definitions of class Page
+	 * */
 
-    const int RECORD_PAGE = 1;
-    const int INDEX_PAGE = 2;
-    const int CATALOG_PAGE = 3;
+	int Page::fetch_from_disk(const char* _file_name, int _pid) const {
+		std::fstream fs(_file_name, std::ios::in | std::ios::binary);
 
-    //error code
-    const int CORRELATE_SUCCESS = 1;
-    const int FILE_SIZE_TOO_SMALL = 2;
+		fs.seekg(0, std::ios::end);
+		if (_pid * PAGE_SIZE + PAGE_SIZE - 1 > fs.tellg()) { //extend to pid PAGE
+			fs.close();	
+			fs.open(_file_name, std::ios::out | std::ios::binary);
+			fs.seekp(_pid * PAGE_SIZE + PAGE_SIZE - 1);
+			fs.put('\0');
+			this->paint_white();
+		}
+		else {
+			fs.seekg(_pid * PAGE_SIZE);
+			fs.read(this->p, PAGE_SIZE);
+		}
 
-    /*
-     *functors
-     * */
+		fs.close();
+	}
 
-    class comp_page_fctor {
+	void Page::write_back() const {
+		std::fstream fs(this->get_file_name(), std::ios::out | std::ios::binary);
+		fs.write(this->p, PAGE_SIZE);
+		fs.close();
+	}
 
-    private:
-    public:
-        bool operator() (const Page *p1, const Page *p2) {
-            return p1->last_use_time > p2->last_use_time;
-        }
-    }
+	void Page::swap_out_with(const char* _file_name, int _pid) {
+		std::cout << "kicked! and pid = " << this->pid << std::endl;
+		this->write_back();
+		this->fetch_from_disk(_file_name, _pid);
+		this->pid = _pid;
+		this->file_name = std::string(_file_name);
+	}
 
+	/*
+	 * Definitions of interface
+	 * */
+	
+	const Page* pull(const char* _file_name, int _pid) {
+		Page* p;
+		int err_code;
+		std::string uuid_to_pull = convert_to_uuid(_file_name, _pid);
 
-    /*
-       Interfaces for Users
-    */
+		//check if this page has been cached in memory
+		std::map<std::string, Page*>::iterator it;
+		it = page_cache_pool.find(uuid_to_pull);
+		if (it != page_cache_pool.end()) { //already cached
+			debug("hit");
+			p = it->second;
+			p->set_lock(LOCKED);
+		}
+		else { //not cached
+			if (page_cache_pool.size() < BUFFER_PAGE_LIMIT) { //create a page directly
+				p = new Page(_file_name, _pid);
+				p->fetch_from_disk(_file_name, _pid);
+				page_cache_pool.insert(wrapper_to_pair(p->get_file_name(), p->get_pid(), p));
+			}
+			else { //swap out the LRU page
+				std::map<std::string, Page*>::iterator LRU_it = page_cache_pool.begin();
+				for (LRU_it; LRU_it != page_cache_pool.end(); ++LRU_it)
+					if (LRU_it->second->get_lock() == UNLOCKED) {
+						break;
+					}
 
-    //for table users
-    const Page& pull(Table& tb, int pid);
-    const Page& create(Table& tb, int user);
-    int commit(Table& tb, int user);
+				it = LRU_it;
+				it++;
+				for (it; it != page_cache_pool.end(); ++it)
+					if (it->second->get_lock() != LOCKED && 
+							it->second->get_last_use_time() < LRU_it->second->get_last_use_time()) {
+						LRU_it = it;
+					}
 
-    //for index users
-    //const Page& pull(Index& idx, int pid, int* err_code);
-    //const Page& create(Index& idx, int user, int* err_code);
-    //int commit(Index& idx, int user, int* errcode);
+				p = LRU_it->second;
+				page_cache_pool.erase(LRU_it);
+				p->swap_out_with(_file_name, _pid);
+				p->set_lock(LOCKED);
+				page_cache_pool.insert(wrapper_to_pair(_file_name, _pid, p));
+			}
+		}
+		return p;
+	}
 
-    //for catalog users
-    //const Page& pull(int pid, int* err_code);
-    //const Page& create(int user, int* err_code);
-    //int commit(int user, int* errcode);
-
-    /*
-        Internal ultilities
-     */
-    class BMExcep {
-        private:
-            int err_code;
-        public:
-            BMExcep(int ec): err_code(ec) {};
-    }
-}
-
-
-namespace <{1:BufferManager}> {
-
-    /*
-        Definitions of some  maintainers
-     */
-
-    std::priority_queue<int, std::vector<Page*>, comp_page_fctor>
-    std::map<std::string, std::map<int, Page&>& >& file_container = *(new std::map<std::string, std::map<int, Page&>& >);
-    int& current_page_num = *(new int(0));
-
-    /*
-     *Definition of class Page
-     * */
-    int Page::capacity = PAGE_SIZE; //4KB
-
-    Page::Page(): p(new char[PAGE_SIZE]()), lock(0), dirty(0), pid(-1), last_use_time(-1) {};
-
-    Page::int correlate_with_file(const string& file_name, int pid) const {
-        int return_code = CORRELATE_SUCCESS;
-        std::ifstream ifs(file_name.c_str(), std::ios::in | std::ios::binary);
-
-        ifs.seekg(0, std::ios::end);
-        if (pid * PAGE_SIZE + PAGE_SIZE - 1 > ifs.tellg()) {
-            return_code = FILE_SIZE_TOO_SMALL;
-        }
-        else {
-            ifs.seekg(pid * PAGE_SIZE);
-            ifs.read(this->p, PAGE_SIZE);
-        }
-
-        ifs.close();
-        return return_code;
-    }
-
-    /*
-     * Definitions of interface
-     * */
-
-
-    //const Page::Page& pull(Table& tb, int pid, int*err_code) {
-    //}
-
-    const Page& create(Table& tb, int _pid) {
-        if (current_page_num < BUFFER_PAGE_LIMIT) {
-            Page& new_page = *(new Page());
-            new_page.set_lock();
-
-            int err_code = new_page.correlate_with_file(tb.get_name(), _pid);
-            if (err_code == CORRELATE_SUCCESS) {
-                table_page_map.insert(new_page.pid)
-            }
-            else {
-                throw BMExcep(err_code);
-            }
-
-            return new_page;
-        }
-        else { //need to do some swap (kick the least-recently-used page)
-
-        }
-    }
+	int commit(const char* _file_name, int _pid) {
+		std::map<std::string, Page*>::iterator it;
+		it = page_cache_pool.find(convert_to_uuid(_file_name, _pid));
+		if (it != page_cache_pool.end()) {
+			it->second->set_lock(UNLOCKED);
+			it->second->set_last_use_time();
+		}
+		else {
+			throw BMExcep(COMMIT_FAIL);
+		}
+	}
 
 }
 
 
 //debug
 int main() {
-    namespace BM = BufferManager;
-    BM::Page p1(std::string("a.txt"), 0);
-    for (int i=0; i<BM::PAGE_SIZE; ++i) std::cout << p1.getc(i);
+	namespace BM = BufferManager;
+	const BM::Page* p[10];
+	for (int i=0; i<10; ++i) {
+		p[i] = BM::pull("test.txt", i);
+		std::cout << "pid ==> " << p[i]->get_pid() << std::endl;
+		BM::commit("test.txt", i);
+		std::cout << p[i]->get_lock() << std::endl;
+	}
+
+	for (int i=10; i<20; ++i) {
+		p[i] = BM::pull("test.txt", i);
+		std::cout << "pid ==> " << p[i]->get_pid() << std::endl;
+		//BM::commit(p[i]->get_file_name(), p[i]->get_pid());
+	}
 }
